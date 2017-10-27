@@ -2,8 +2,8 @@
 % Please edit documentation in R/NewDataConversion.R
 \name{convertToCyclopsData}
 \alias{convertToCyclopsData}
-\alias{convertToCyclopsData.data.frame}
 \alias{convertToCyclopsData.ffdf}
+\alias{convertToCyclopsData.data.frame}
 \title{Convert data from two data frames or ffdf objects into a CyclopsData object}
 \usage{
 convertToCyclopsData(outcomes, covariates, modelType = "lr",
@@ -49,6 +49,7 @@ These columns are expected in the outcome object:
   \verb{y}    \tab(real) \tab The outcome variable \cr
   \verb{time}    \tab(real) \tab For models that use time (e.g. Poisson or Cox regression) this contains time \cr
                  \tab        \tab(e.g. number of days) \cr
+  \verb{weight} \tab(real) \tab Non-negative weight to apply to outcome
 }
 
 These columns are expected in the covariates object:
@@ -71,6 +72,7 @@ stratumId (if present), -time, y, and rowId.
 
 \item \code{data.frame}: Convert data from two \code{data.frame}
 }}
+
 \examples{
 #Convert infert dataset to Cyclops format:
 covariates <- data.frame(stratumId = rep(infert$stratum, 2),
@@ -91,4 +93,3 @@ cyclopsData <- convertToCyclopsData(outcomes, covariates, modelType = "clr",
 fit <- fitCyclopsModel(cyclopsData, prior = createPrior("none"))
 
 }
-

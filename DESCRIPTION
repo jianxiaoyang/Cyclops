@@ -19,7 +19,7 @@ Depends:
     R (>= 3.1.0)
 Imports:
     Matrix,
-    Rcpp (>= 0.12.4),
+    Rcpp (>= 0.12.12),
     bit,
     ff,
     ffbase,
@@ -30,8 +30,9 @@ LinkingTo: Rcpp,
     BH (>= 1.51.0),
     RcppEigen (>= 0.3.2),
     RcppParallel
+SystemRequirements: GNU make
 Suggests:
     testthat,
     gnm,
     ggplot2
-RoxygenNote: 5.0.1
+RoxygenNote: 6.0.1

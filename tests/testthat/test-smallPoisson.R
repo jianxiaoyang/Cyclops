@@ -70,7 +70,6 @@ test_that("Small Poisson fixed beta", {
 #     ## TODO Check output of confint for "Using 2 thread(s)"
 # })
 
-
 test_that("Specify CI level", {
 ###function(object, parm, level, ...)
     counts <- c(18,17,15,20,10,20,25,13,12)
