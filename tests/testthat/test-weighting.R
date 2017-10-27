@@ -99,6 +99,12 @@ test_that("Check predictive log likelihood",{
     # Get predictive log likelihood of first set
     pred <- Cyclops:::.cyclopsGetPredictiveLogLikelihood(fit$interface, weights = 1 - weights)
     expect_equal(pred, as.numeric(logLik(gold)), tolerance)
+
+    # Reweight in gPLL
+    weights2 = rep(c(0,1,0,0,1,1,1), 2)
+    fit2 <- fitCyclopsModel(data, weights = weights2)
+    pred2 <- Cyclops:::.cyclopsGetPredictiveLogLikelihood(fit$interface, weights = weights2)
+    expect_equal(pred2, as.numeric(logLik(fit2)), tolerance = 1E-4) # Not equal
 })
 
 test_that("Check very small Cox example with weighting", {
