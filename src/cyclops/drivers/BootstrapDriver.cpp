@@ -22,11 +22,11 @@ using std::ostream_iterator;
 
 BootstrapDriver::BootstrapDriver(
 		int inReplicates,
-		ModelData* inModelData,
+		AbstractModelData* inModelData,
 		loggers::ProgressLoggerPtr _logger,
-		loggers::ErrorHandlerPtr _error		
+		loggers::ErrorHandlerPtr _error
 		) : AbstractDriver(_logger, _error), replicates(inReplicates), modelData(inModelData),
-		J(inModelData->getNumberOfColumns()) {
+		J(inModelData->getNumberOfCovariates()) {
 
 	// Set-up storage for bootstrap estimates
 	estimates.resize(J);
@@ -50,7 +50,7 @@ void BootstrapDriver::drive(
 		const CCDArguments& arguments) {
 
 	// TODO Make sure that selector is type-of BootstrapSelector
-	std::vector<real> weights;
+	std::vector<double> weights;
 
 	for (int step = 0; step < replicates; step++) {
 		selector.permute();
@@ -66,7 +66,7 @@ void BootstrapDriver::drive(
 		// Store point estimates
 		for (int j = 0; j < J; ++j) {
 			estimates[j]->push_back(ccd.getBeta(j));
-		}		
+		}
 	}
 }
 
@@ -80,7 +80,7 @@ void BootstrapDriver::logResults(const CCDArguments& arguments, std::vector<doub
 
 	ofstream outLog(arguments.outFileName.c_str());
 	if (!outLog) {
-        std::ostringstream stream;        
+        std::ostringstream stream;
 		stream << "Unable to open log file: " << arguments.bsFileName;
 		error->throwError(stream);
 	}
@@ -94,16 +94,16 @@ void BootstrapDriver::logResults(const CCDArguments& arguments, std::vector<doub
 	}
 
 	for (int j = 0; j < J; ++j) {
-		outLog << modelData->getColumn(j).getLabel() <<
+		outLog << modelData->getColumnLabel(j) <<
 			sep << conditionId << sep;
 		if (arguments.reportRawEstimates) {
-			ostream_iterator<real> output(outLog, sep.c_str());
+			ostream_iterator<double> output(outLog, sep.c_str());
 			copy(estimates[j]->begin(), estimates[j]->end(), output);
 			outLog << endl;
 		} else {
-			real mean = 0.0;
-			real var = 0.0;
-			real prob0 = 0.0;
+			double mean = 0.0;
+			double var = 0.0;
+			double prob0 = 0.0;
 			for (rvector::iterator it = estimates[j]->begin(); it != estimates[j]->end(); ++it) {
 				mean += *it;
 				var += *it * *it;
@@ -112,7 +112,7 @@ void BootstrapDriver::logResults(const CCDArguments& arguments, std::vector<doub
 				}
 			}
 
-			real size = static_cast<real>(estimates[j]->size());
+			double size = static_cast<double>(estimates[j]->size());
 			mean /= size;
 			var = (var / size) - (mean * mean);
 			prob0 /= size;
@@ -121,8 +121,8 @@ void BootstrapDriver::logResults(const CCDArguments& arguments, std::vector<doub
 			int offsetLower = static_cast<int>(size * 0.025);
 			int offsetUpper = static_cast<int>(size * 0.975);
 
-			real lower = *(estimates[j]->begin() + offsetLower);
-			real upper = *(estimates[j]->begin() + offsetUpper);
+			double lower = *(estimates[j]->begin() + offsetLower);
+			double upper = *(estimates[j]->begin() + offsetUpper);
 
 			outLog << savedBeta[j] << sep;
 			outLog << std::sqrt(var) << sep << mean << sep << lower << sep << upper << sep << prob0 << endl;

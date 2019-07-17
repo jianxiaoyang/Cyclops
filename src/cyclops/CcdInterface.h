@@ -26,7 +26,7 @@
 namespace bsccs {
 
     class CyclicCoordinateDescent; // forward declaration
-    class ModelData;
+    class AbstractModelData;
     class AbstractModelSpecifics;
 
 struct CrossValidationArguments {
@@ -59,6 +59,14 @@ struct CrossValidationArguments {
         { }
 };
 
+struct ComputeDeviceArguments {
+    std::string name;
+
+    ComputeDeviceArguments() :
+        name("native")
+    { }
+};
+
 struct ModeFindingArguments {
 
 	// All options related to mode-finding should (TODO) go here
@@ -70,6 +78,7 @@ struct ModeFindingArguments {
 	int swindleMultipler;
 	double initialBound;
 	int maxBoundCount;
+	AlgorithmType algorithmType;
 
 	ModeFindingArguments() :
 		tolerance(1E-6),
@@ -79,7 +88,8 @@ struct ModeFindingArguments {
 		useKktSwindle(false),
 		swindleMultipler(10),
 		initialBound(2.0),
-		maxBoundCount(5)
+		maxBoundCount(5),
+		algorithmType(AlgorithmType::CCD)
 	    { }
 };
 
@@ -132,6 +142,7 @@ struct CCDArguments {
 
 	ModeFindingArguments modeFinding;
 	CrossValidationArguments crossValidation;
+	ComputeDeviceArguments computeDevice;
 };
 
 
@@ -143,7 +154,7 @@ public:
     virtual ~CcdInterface();
 
     double initializeModel(
-            ModelData** modelData,
+            AbstractModelData** modelData,
             CyclicCoordinateDescent** ccd,
             AbstractModelSpecifics** model);
 
@@ -155,11 +166,11 @@ public:
 
     double predictModel(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData);
+            AbstractModelData *modelData);
 
     double profileModel(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData,
+            AbstractModelData *modelData,
             const ProfileVector& profileCI,
             ProfileInformationMap &profileMap,
             int threads,
@@ -169,11 +180,11 @@ public:
 
     double runCrossValidation(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData);
+            AbstractModelData *modelData);
 
     double runBoostrap(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData,
+            AbstractModelData *modelData,
             std::vector<double>& savedBeta);
 
     void setDefaultArguments();
@@ -181,13 +192,13 @@ public:
     void setZeroBetaAsFixed(
             CyclicCoordinateDescent *ccd);
 
-    double logModel(CyclicCoordinateDescent *ccd, ModelData *modelData,
+    double logModel(CyclicCoordinateDescent *ccd, AbstractModelData *modelData,
             ProfileInformationMap &profileMap,
             bool withProfileBounds);
 
     double diagnoseModel(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData,
+            AbstractModelData *modelData,
             double loadTime,
             double updateTime);
 
@@ -211,21 +222,21 @@ protected:
     CCDArguments arguments;
 
     virtual void initializeModelImpl(
-            ModelData** modelData,
+            AbstractModelData** modelData,
             CyclicCoordinateDescent** ccd,
             AbstractModelSpecifics** model) = 0;
 
     virtual void predictModelImpl(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData) = 0;
+            AbstractModelData *modelData) = 0;
 
-    virtual void logModelImpl(CyclicCoordinateDescent *ccd, ModelData *modelData,
+    virtual void logModelImpl(CyclicCoordinateDescent *ccd, AbstractModelData *modelData,
             ProfileInformationMap &profileMap,
             bool withProfileBounds) = 0;
 
     virtual void diagnoseModelImpl(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData,
+            AbstractModelData *modelData,
     		double loadTime,
     		double updateTime) = 0;
 

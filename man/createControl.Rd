@@ -6,11 +6,12 @@
 \usage{
 createControl(maxIterations = 1000, tolerance = 1e-06,
   convergenceType = "gradient", cvType = "auto", fold = 10,
-  lowerLimit = 0.01, upperLimit = 20, gridSteps = 10, cvRepetitions = 1,
-  minCVData = 100, noiseLevel = "silent", threads = 1, seed = NULL,
-  resetCoefficients = FALSE, startingVariance = -1, useKKTSwindle = FALSE,
-  tuneSwindle = 10, selectorType = "auto", initialBound = 2,
-  maxBoundCount = 5)
+  lowerLimit = 0.01, upperLimit = 20, gridSteps = 10,
+  cvRepetitions = 1, minCVData = 100, noiseLevel = "silent",
+  threads = 1, seed = NULL, resetCoefficients = FALSE,
+  startingVariance = -1, useKKTSwindle = FALSE, tuneSwindle = 10,
+  selectorType = "auto", initialBound = 2, maxBoundCount = 5,
+  algorithm = "ccd")
 }
 \arguments{
 \item{maxIterations}{Integer: maximum iterations of Cyclops to attempt before returning a failed-to-converge error}
@@ -57,7 +58,9 @@ the average number of rows per stratum is smaller than the number of strata.}
 
 \item{initialBound}{Numeric: Starting trust-region size}
 
-\item{maxBoundCount}{Numeric: Maximum number of tries to decrease initial trust-region size
+\item{maxBoundCount}{Numeric: Maximum number of tries to decrease initial trust-region size}
+
+\item{algorithm}{String: name of fitting algorithm to employ; default is `ccd`
 
 Todo: Describe convegence types}
 }

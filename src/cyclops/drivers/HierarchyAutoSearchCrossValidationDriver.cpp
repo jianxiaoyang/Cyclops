@@ -23,11 +23,11 @@ namespace bsccs {
 
 //const static int MAX_STEPS = 50;
 
-HierarchyAutoSearchCrossValidationDriver::HierarchyAutoSearchCrossValidationDriver(const ModelData& _modelData,
+HierarchyAutoSearchCrossValidationDriver::HierarchyAutoSearchCrossValidationDriver(const AbstractModelData& _modelData,
 		const CCDArguments& arguments,
 		loggers::ProgressLoggerPtr _logger,
 		loggers::ErrorHandlerPtr _error,
-		vector<real>* wtsExclude) : AutoSearchCrossValidationDriver(
+		vector<double>* wtsExclude) : AutoSearchCrossValidationDriver(
 				_modelData,
 				arguments,
 				_logger,
@@ -57,7 +57,7 @@ void HierarchyAutoSearchCrossValidationDriver::drive(
 		const CCDArguments& allArguments) {
 
 	// TODO Check that selector is type of CrossValidationSelector
-	std::vector<real> weights;
+	std::vector<double> weights;
 
     const auto& arguments = allArguments.crossValidation;
 

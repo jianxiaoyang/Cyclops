@@ -21,6 +21,10 @@
     .Call(`_Cyclops_cyclopsGetUseOffsetNames`)
 }
 
+.cyclopsGetComputeDevice <- function(inRcppCcdInterface) {
+    .Call(`_Cyclops_cyclopsGetComputeDevice`, inRcppCcdInterface)
+}
+
 .cyclopsSetBeta <- function(inRcppCcdInterface, beta) {
     invisible(.Call(`_Cyclops_cyclopsSetBeta`, inRcppCcdInterface, beta))
 }
@@ -39,6 +43,10 @@
 
 .cyclopsGetPredictiveLogLikelihood <- function(inRcppCcdInterface, weights) {
     .Call(`_Cyclops_cyclopsGetPredictiveLogLikelihood`, inRcppCcdInterface, weights)
+}
+
+.cyclopsGetNewPredictiveLogLikelihood <- function(inRcppCcdInterface, weights) {
+    .Call(`_Cyclops_cyclopsGetNewPredictiveLogLikelihood`, inRcppCcdInterface, weights)
 }
 
 .cyclopsGetLogLikelihood <- function(inRcppCcdInterface) {
@@ -69,8 +77,8 @@
     .Call(`_Cyclops_cyclopsPredictModel`, inRcppCcdInterface)
 }
 
-.cyclopsSetControl <- function(inRcppCcdInterface, maxIterations, tolerance, convergenceType, useAutoSearch, fold, foldToCompute, lowerLimit, upperLimit, gridSteps, noiseLevel, threads, seed, resetCoefficients, startingVariance, useKKTSwindle, swindleMultipler, selectorType, initialBound, maxBoundCount) {
-    invisible(.Call(`_Cyclops_cyclopsSetControl`, inRcppCcdInterface, maxIterations, tolerance, convergenceType, useAutoSearch, fold, foldToCompute, lowerLimit, upperLimit, gridSteps, noiseLevel, threads, seed, resetCoefficients, startingVariance, useKKTSwindle, swindleMultipler, selectorType, initialBound, maxBoundCount))
+.cyclopsSetControl <- function(inRcppCcdInterface, maxIterations, tolerance, convergenceType, useAutoSearch, fold, foldToCompute, lowerLimit, upperLimit, gridSteps, noiseLevel, threads, seed, resetCoefficients, startingVariance, useKKTSwindle, swindleMultipler, selectorType, initialBound, maxBoundCount, algorithm) {
+    invisible(.Call(`_Cyclops_cyclopsSetControl`, inRcppCcdInterface, maxIterations, tolerance, convergenceType, useAutoSearch, fold, foldToCompute, lowerLimit, upperLimit, gridSteps, noiseLevel, threads, seed, resetCoefficients, startingVariance, useKKTSwindle, swindleMultipler, selectorType, initialBound, maxBoundCount, algorithm))
 }
 
 .cyclopsRunCrossValidation <- function(inRcppCcdInterface) {
@@ -85,8 +93,8 @@
     .Call(`_Cyclops_cyclopsLogModel`, inRcppCcdInterface)
 }
 
-.cyclopsInitializeModel <- function(inModelData, modelType, computeMLE = FALSE) {
-    .Call(`_Cyclops_cyclopsInitializeModel`, inModelData, modelType, computeMLE)
+.cyclopsInitializeModel <- function(inModelData, modelType, computeDevice, computeMLE = FALSE) {
+    .Call(`_Cyclops_cyclopsInitializeModel`, inModelData, modelType, computeDevice, computeMLE)
 }
 
 .isSorted <- function(dataFrame, indexes, ascending) {
@@ -150,6 +158,18 @@ getCovariateTypes <- function(object, covariateLabel) {
     .Call(`_Cyclops_cyclopsGetCovariateType`, object, covariateLabel)
 }
 
+#' @title Get floating point size
+#'
+#' @description
+#' \code{getFloatingPointSize} returns the floating-point representation size in a Cyclops data object
+#'
+#' @param object   A Cyclops data object
+#'
+#' @export
+getFloatingPointSize <- function(object) {
+    .Call(`_Cyclops_cyclopsGetFloatingPointSize`, object)
+}
+
 #' @title Get total number of covariates
 #'
 #' @description
@@ -170,7 +190,7 @@ getNumberOfCovariates <- function(object) {
 #' @param object      A Cyclops data object
 #' @param file        Filename
 #'
-#' @export
+#' @keywords internal
 printMatrixMarket <- function(object, file) {
     invisible(.Call(`_Cyclops_cyclopsPrintMatrixMarket`, object, file))
 }
@@ -203,6 +223,10 @@ getNumberOfTypes <- function(object) {
     .Call(`_Cyclops_cyclopsUnivariableCorrelation`, x, covariateLabel)
 }
 
+.cyclopsUnivariableSeparability <- function(x, covariateLabel) {
+    .Call(`_Cyclops_cyclopsUnivariableSeparability`, x, covariateLabel)
+}
+
 .cyclopsSumByGroup <- function(x, covariateLabel, groupByLabel, power) {
     .Call(`_Cyclops_cyclopsSumByGroup`, x, covariateLabel, groupByLabel, power)
 }
@@ -215,8 +239,8 @@ getNumberOfTypes <- function(object) {
     .Call(`_Cyclops_cyclopsSum`, x, covariateLabel, power)
 }
 
-.cyclopsNewSqlData <- function(modelTypeName, noiseLevel) {
-    .Call(`_Cyclops_cyclopsNewSqlData`, modelTypeName, noiseLevel)
+.cyclopsNewSqlData <- function(modelTypeName, noiseLevel, floatingPoint) {
+    .Call(`_Cyclops_cyclopsNewSqlData`, modelTypeName, noiseLevel, floatingPoint)
 }
 
 .cyclopsMedian <- function(vector) {
@@ -283,7 +307,7 @@ getTimeVector <- function(object) {
     .Call(`_Cyclops_cyclopsReadFileData`, fileName, modelTypeName)
 }
 
-.cyclopsModelData <- function(pid, y, z, offs, dx, sx, ix, modelTypeName, useTimeAsOffset = FALSE, numTypes = 1L) {
-    .Call(`_Cyclops_cyclopsModelData`, pid, y, z, offs, dx, sx, ix, modelTypeName, useTimeAsOffset, numTypes)
+.cyclopsModelData <- function(pid, y, z, offs, dx, sx, ix, modelTypeName, useTimeAsOffset = FALSE, numTypes = 1L, floatingPoint = 64L) {
+    .Call(`_Cyclops_cyclopsModelData`, pid, y, z, offs, dx, sx, ix, modelTypeName, useTimeAsOffset, numTypes, floatingPoint)
 }
 

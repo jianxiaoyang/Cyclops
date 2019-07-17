@@ -16,7 +16,7 @@ namespace bsccs {
 // typedef std::vector<Rcpp::List> NeighborhoodMap;
 // typedef Rcpp::List NeighborhoodMap;
 
-class RcppModelData; // forward reference
+class AbstractModelData; // forward reference
 
 class RcppCcdInterface : public CcdInterface {
 
@@ -24,7 +24,7 @@ public:
 
 	RcppCcdInterface();
 
-    RcppCcdInterface(RcppModelData& modelData);
+    RcppCcdInterface(AbstractModelData& modelData);
 
     virtual ~RcppCcdInterface();
 
@@ -91,7 +91,7 @@ public:
 
     // For debug purposes
     CyclicCoordinateDescent& getCcd() { return *ccd; }
-    ModelData& getModelData() { return *modelData; }
+    AbstractModelData& getModelData() { return *modelData; }
 
     static void appendRList(Rcpp::List& list, const Rcpp::List& append);
 
@@ -119,31 +119,34 @@ protected:
 				const NeighborhoodMap& neighborhood);
 
     void initializeModelImpl(
-            ModelData** modelData,
+            AbstractModelData** modelData,
             CyclicCoordinateDescent** ccd,
             AbstractModelSpecifics** model);
 
     void predictModelImpl(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData);
+            AbstractModelData *modelData);
 
     void logModelImpl(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData,
+            AbstractModelData *modelData,
             ProfileInformationMap& profileMap,
             bool withASE);
 
      void diagnoseModelImpl(
             CyclicCoordinateDescent *ccd,
-            ModelData *modelData,
+            AbstractModelData *modelData,
     		double loadTime,
     		double updateTime);
 
 private:
 
-			RcppModelData& rcppModelData; // TODO Make const?
+			AbstractModelData& rcppModelData; // TODO Make const?
 
-	 		ModelData* modelData;
+	 		AbstractModelData* modelData;
+
+// 	 		ModelData* modelData;
+
 			CyclicCoordinateDescent* ccd;
 			AbstractModelSpecifics* modelSpecifics;
 

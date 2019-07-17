@@ -19,7 +19,7 @@ namespace bsccs {
 AbstractCrossValidationDriver::AbstractCrossValidationDriver(
 			loggers::ProgressLoggerPtr _logger,
 			loggers::ErrorHandlerPtr _error,
-			std::vector<real>* wtsExclude
+			std::vector<double>* wtsExclude
 	) : AbstractDriver(_logger, _error), weightsExclude(wtsExclude) {
 	// Do nothing
 }
@@ -178,7 +178,7 @@ double AbstractCrossValidationDriver::doCrossValidationStep(
 				int fold = task % arguments.fold;
 
 				// Get this fold and update
-				std::vector<real> weights; // Task-specific
+				std::vector<double> weights; // Task-specific
 				selectorTask->getWeights(fold, weights);
 				if (weightsExclude){
 					for(size_t j = 0; j < weightsExclude->size(); j++){
@@ -216,7 +216,7 @@ double AbstractCrossValidationDriver::doCrossValidationStep(
 						}
 					}
 
-					double logLikelihood = ccdTask->getPredictiveLogLikelihood(&weights[0]);
+					double logLikelihood = ccdTask->getNewPredictiveLogLikelihood(&weights[0]);
 
 					// Store value
 					stream << logLikelihood;

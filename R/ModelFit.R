@@ -26,12 +26,13 @@
 #'
 #' @param cyclopsData			A Cyclops data object
 #' @template prior
-#' @param control Cyclops control object, see \code{"\link{control}"}
+#' @param control  A \code{"cyclopsControl"} object constructed by \code{\link{createControl}}
 #' @param weights Vector of 0/1 weights for each data row
 #' @param forceNewObject Logical, forces the construction of a new Cyclops model fit object
 #' @param returnEstimates Logical, return regression coefficient estimates in Cyclops model fit object
 #' @param startingCoefficients Vector of starting values for optimization
 #' @param fixedCoefficients Vector of booleans indicating if coefficient should be fix
+#' @param computeDevice String: Name of compute device to employ; defaults to \code{"native"} C++ on CPU
 #'
 #' @return
 #' A list that contains a Cyclops model fit object pointer and an operation duration
@@ -68,7 +69,8 @@ fitCyclopsModel <- function(cyclopsData,
                             forceNewObject = FALSE,
                             returnEstimates = TRUE,
                             startingCoefficients = NULL,
-                            fixedCoefficients = NULL) {
+                            fixedCoefficients = NULL,
+							computeDevice = "native") {
 
     # Delegate to control$setHook if exists
     if (!is.null(control$setHook)) {
@@ -95,7 +97,7 @@ fitCyclopsModel <- function(cyclopsData,
         stop("Data are incompletely loaded")
     }
 
-    .checkInterface(cyclopsData, forceNewObject)
+    .checkInterface(cyclopsData, computeDevice =  computeDevice, forceNewObject = forceNewObject)
 
     # Set up prior
     stopifnot(inherits(prior, "cyclopsPrior"))
@@ -115,7 +117,7 @@ fitCyclopsModel <- function(cyclopsData,
                                          })
         }
 
-        if (prior$priorType != "none" &&
+        if (prior$priorType[1] != "none" &&
             is.null(prior$graph) && # TODO Ignore hierarchical models for now
             .cyclopsGetHasIntercept(cyclopsData) &&
             !prior$forceIntercept) {
@@ -211,19 +213,29 @@ fitCyclopsModel <- function(cyclopsData,
         }
     }
 
-    if (!is.null(weights)) {
-        if (prior$useCrossValidation) {
-            stop("Can not set data weights and use cross-validation simultaneously")
+    # Handle weights
+
+    weightsUnsorted <- TRUE
+    if (!is.null(cyclopsData$weights)) {
+        if (!is.null(weights)) {
+            warning("Using weights passed to fitCyclopsModel()")
+        } else {
+            weights <- cyclopsData$weights
+            weightsUnsorted <- FALSE
         }
+    }
+    if (!is.null(weights)) {
         if (length(weights) != getNumberOfRows(cyclopsData)) {
             stop("Must provide a weight for each data row")
         }
-        if (!all(weights %in% c(0,1))) {
-            stop("Only 0/1 weights are currently supported")
+        if (any(weights < 0)) {
+            stop("Only non-negative weights are allowed")
         }
 
-        if(!is.null(cyclopsData$sortOrder)) {
-            weights <- weights[cyclopsData$sortOrder]
+        if (weightsUnsorted) {
+            if (!is.null(cyclopsData$sortOrder)) {
+                weights <- weights[cyclopsData$sortOrder]
+            }
         }
 
         .cyclopsSetWeights(cyclopsData$cyclopsInterfacePtr, weights)
@@ -243,7 +255,7 @@ fitCyclopsModel <- function(cyclopsData,
         fit <- .cyclopsFitModel(cyclopsData$cyclopsInterfacePtr)
     }
 
-    if (returnEstimates && fit$return_flag == "SUCCESS") {
+    if (returnEstimates) {
         estimates <- .cyclopsLogModel(cyclopsData$cyclopsInterfacePtr)
         fit <- c(fit, estimates)
         fit$estimation <- as.data.frame(fit$estimation)
@@ -251,6 +263,9 @@ fitCyclopsModel <- function(cyclopsData,
     fit$call <- cl
     fit$cyclopsData <- cyclopsData
     fit$coefficientNames <- cyclopsData$coefficientNames
+    if (!is.null(fixedCoefficients)) {
+        fit$fixedCoefficients <- fixedCoefficients
+    }
     fit$rowNames <- cyclopsData$rowNames
     fit$scale <- cyclopsData$scale
     fit$threads <- threads
@@ -263,7 +278,8 @@ fitCyclopsModel <- function(cyclopsData,
         saved <- covariates
         if (inherits(covariates, "character")) {
             # Try to match names
-            covariates <- match(covariates, cyclopsData$coefficientNames)
+            indices <- match(covariates, cyclopsData$coefficientNames)
+            covariates <- getCovariateIds(cyclopsData)[indices]
         }
         covariates = as.numeric(covariates)
 
@@ -284,18 +300,24 @@ fitCyclopsModel <- function(cyclopsData,
     }
 }
 
-.checkInterface <- function(x, forceNewObject = FALSE, testOnly = FALSE) {
+.checkInterface <- function(x, computeDevice = "native", forceNewObject = FALSE, testOnly = FALSE) {
     if (forceNewObject
         || is.null(x$cyclopsInterfacePtr)
         || class(x$cyclopsInterfacePtr) != "externalptr"
         || .isRcppPtrNull(x$cyclopsInterfacePtr)
+        || .cyclopsGetComputeDevice(x$cyclopsInterfacePtr) != computeDevice
     ) {
 
         if (testOnly == TRUE) {
             stop("Interface object is not initialized")
         }
+
+        # if (computeDevice != "native") {
+        #     stopifnot(computeDevice %in% listOpenCLDevices())
+        # }
+
         # Build interface
-        interface <- .cyclopsInitializeModel(x$cyclopsDataPtr, modelType = x$modelType, computeMLE = TRUE)
+        interface <- .cyclopsInitializeModel(x$cyclopsDataPtr, modelType = x$modelType, computeDevice, computeMLE = TRUE)
         # TODO Check for errors
         assign("cyclopsInterfacePtr", interface$interface, x)
     }
@@ -310,15 +332,18 @@ fitCyclopsModel <- function(cyclopsData,
 #'
 #' @param object    Cyclops model fit object
 #' @param rescale   Boolean: rescale coefficients for unnormalized covariate values
+#' @param ignoreConvergence Boolean: return coefficients even if fit object did not converge
 #' @param ...       Other arguments
 #'
 #' @return Named numeric vector of model coefficients.
 #'
 #' @export
-coef.cyclopsFit <- function(object, rescale = FALSE, ...) {
-    if (is.null(object$estimation)) {
+coef.cyclopsFit <- function(object, rescale = FALSE, ignoreConvergence = FALSE, ...) {
+
+    if (object$return_flag != "SUCCESS" && !ignoreConvergence) {
         stop("Cyclops estimation is null; suspect that estimation did not converge.")
     }
+
     result <- object$estimation$estimate
     if (is.null(object$coefficientNames)) {
         names(result) <- object$estimation$column_label
@@ -432,6 +457,7 @@ print.cyclopsFit <- function(x, show.call=TRUE ,...) {
 #'                              the average number of rows per stratum is smaller than the number of strata.
 #' @param initialBound          Numeric: Starting trust-region size
 #' @param maxBoundCount         Numeric: Maximum number of tries to decrease initial trust-region size
+#' @param algorithm             String: name of fitting algorithm to employ; default is `ccd`
 #'
 #' Todo: Describe convegence types
 #'
@@ -460,7 +486,8 @@ createControl <- function(maxIterations = 1000,
                           tuneSwindle = 10,
                           selectorType = "auto",
                           initialBound = 2.0,
-                          maxBoundCount = 5) {
+                          maxBoundCount = 5,
+                          algorithm = "ccd") {
     validCVNames = c("grid", "auto")
     stopifnot(cvType %in% validCVNames)
 
@@ -469,6 +496,9 @@ createControl <- function(maxIterations = 1000,
     stopifnot(threads == -1 || threads >= 1)
     stopifnot(startingVariance == -1 || startingVariance > 0)
     stopifnot(selectorType %in% c("auto","byPid", "byRow"))
+
+    validAlgorithmNames = c("ccd", "mm")
+    stopifnot(algorithm %in% validAlgorithmNames)
 
     structure(list(maxIterations = maxIterations,
                    tolerance = tolerance,
@@ -489,7 +519,8 @@ createControl <- function(maxIterations = 1000,
                    tuneSwindle = tuneSwindle,
                    selectorType = selectorType,
                    initialBound = initialBound,
-                   maxBoundCount = maxBoundCount),
+                   maxBoundCount = maxBoundCount,
+                   algorithm = algorithm),
               class = "cyclopsControl")
 }
 
@@ -528,7 +559,7 @@ createPrior <- function(priorType,
                         neighborhood = NULL,
                         useCrossValidation = FALSE,
                         forceIntercept = FALSE) {
-    validNames = c("none", "laplace","normal", "hierarchical")
+    validNames = c("none", "laplace","normal", "barupdate", "hierarchical")
     stopifnot(priorType %in% validNames)
     if (!is.null(exclude)) {
         if (!inherits(exclude, "character") &&
@@ -543,10 +574,13 @@ createPrior <- function(priorType,
         stop("Prior types and variances have a dimensionality mismatch")
     }
 
-    if (priorType == "none" && useCrossValidation) {
+    if (all(priorType == "none") && useCrossValidation) {
         stop("Cannot perform cross validation with a flat prior")
     }
-    if (priorType == "hierarchical" && missing(graph)) {
+    if (any(priorType == "barupdate") && useCrossValidation) {
+        stop("Cannot perform cross valudation with BAR updates")
+    }
+    if (any(priorType == "hierarchical") && missing(graph)) {
         stop("Must provide a graph for a hierarchical prior")
     }
     if (!is.null(neighborhood)) {
@@ -594,8 +628,8 @@ getCyclopsPredictiveLogLikelihood <- function(object, weights) {
     if (length(weights) != getNumberOfRows(object$cyclopsData)) {
         stop("Must provide a weight for each data row")
     }
-    if (!all(weights %in% c(0,1))) {
-        stop("Only 0/1 weights are currently supported")
+    if (any(weights < 0)) {
+        stop("Only non-negative weights are allowed")
     }
 
     if(!is.null(object$cyclopsData$sortOrder)) {
@@ -633,13 +667,19 @@ getCrossValidationInfo <- function(object) {
             control$seed <- as.integer(Sys.time())
         }
 
+        if (is.na(control$algorithm)) { # Provide backwards compatibility
+            control$algorithm <- "ccd"
+        }
+
         .cyclopsSetControl(cyclopsInterfacePtr, control$maxIterations, control$tolerance,
                            control$convergenceType, control$autoSearch, control$fold,
                            (control$fold * control$cvRepetitions),
                            control$lowerLimit, control$upperLimit, control$gridSteps,
                            control$noiseLevel, control$threads, control$seed, control$resetCoefficients,
                            control$startingVariance, control$useKKTSwindle, control$tuneSwindle,
-                           control$selectorType, control$initialBound, control$maxBoundCount)
+                           control$selectorType, control$initialBound, control$maxBoundCount,
+                           control$algorithm
+                          )
     }
 }
 
@@ -711,6 +751,12 @@ confint.cyclopsFit <- function(object, parm, level = 0.95, #control,
     threshold <- qchisq(level, df = 1) / 2
     threads <- object$threads
 
+    if (!is.null(object$fixedCoefficients)) {
+        if (any(object$fixedCoefficients[parm])) {
+            stop("Cannot estimate confidence interval for a fixed coefficient")
+        }
+    }
+
     prof <- .cyclopsProfileModel(object$cyclopsData$cyclopsInterfacePtr, parm,
                                  threads, threshold,
                                  overrideNoRegularization,
@@ -741,7 +787,7 @@ confint.cyclopsFit <- function(object, parm, level = 0.95, #control,
 #' @param parm      A specification of which parameters require confidence intervals,
 #'                  either a vector of numbers of covariateId names
 #' @param level     Numeric: confidence level required
-#' @param control   A Cyclops \code{\link{control}} object
+#' @param control   A \code{"cyclopsControl"} object constructed by \code{\link{createControl}}
 #' @param overrideNoRegularization   Logical: Enable confidence interval estimation for regularized parameters
 #' @param ... Additional argument(s) for methods
 #'
@@ -779,7 +825,7 @@ aconfint <- function(object, parm, level = 0.95, control,
 #' \code{vcov.cyclopsFit} returns the variance-covariance matrix for all covariates of a Cyclops model object
 #'
 #' @param object    A fitted Cyclops model object
-#' @param control   A Cyclops \code{\link{control}} object
+#' @param control    A \code{"cyclopsControl"} object constructed by \code{\link{createControl}}
 #' @param overrideNoRegularization   Logical: Enable variance-covariance estimation for regularized parameters
 #' @param ... Additional argument(s) for methods
 #'

@@ -94,6 +94,13 @@ std::vector<std::string> cyclopsGetUseOffsetNames() {
 	return names;
 }
 
+// [[Rcpp::export(.cyclopsGetComputeDevice)]]
+std::string cyclopsGetComputeDevice(SEXP inRcppCcdInterface) {
+    using namespace bsccs;
+    XPtr<RcppCcdInterface> interface(inRcppCcdInterface);
+    return interface->getArguments().computeDevice.name;
+}
+
 // [[Rcpp::export(.cyclopsSetBeta)]]
 void cyclopsSetBeta(SEXP inRcppCcdInterface, const std::vector<double>& beta) {
     using namespace bsccs;
@@ -131,7 +138,18 @@ double cyclopsGetPredictiveLogLikelihood(SEXP inRcppCcdInterface,
     using namespace bsccs;
     XPtr<RcppCcdInterface> interface(inRcppCcdInterface);
 
-    return interface->getCcd().getPredictiveLogLikelihood(&weights[0]);
+    // return interface->getCcd().getPredictiveLogLikelihood(&weights[0]);
+    Rcpp::stop("No longer implemented");
+    return 0.0;
+}
+
+// [[Rcpp::export(".cyclopsGetNewPredictiveLogLikelihood")]]
+double cyclopsGetNewPredictiveLogLikelihood(SEXP inRcppCcdInterface,
+                                         NumericVector& weights) {
+    using namespace bsccs;
+    XPtr<RcppCcdInterface> interface(inRcppCcdInterface);
+
+    return interface->getCcd().getNewPredictiveLogLikelihood(&weights[0]);
 }
 
 // [[Rcpp::export(".cyclopsGetLogLikelihood")]]
@@ -160,7 +178,7 @@ Eigen::MatrixXd cyclopsGetFisherInformation(SEXP inRcppCcdInterface, const SEXP 
 	        indices.push_back(index);
 	    }
 	} else {
-		for (size_t index = 0; index < interface->getModelData().getNumberOfColumns(); ++index) {
+		for (size_t index = 0; index < interface->getModelData().getNumberOfCovariates(); ++index) {
 			indices.push_back(index);
 		}
 	}
@@ -357,7 +375,7 @@ void cyclopsSetControl(SEXP inRcppCcdInterface,
 		bool useAutoSearch, int fold, int foldToCompute, double lowerLimit, double upperLimit, int gridSteps,
 		const std::string& noiseLevel, int threads, int seed, bool resetCoefficients, double startingVariance,
         bool useKKTSwindle, int swindleMultipler, const std::string& selectorType, double initialBound,
-        int maxBoundCount
+        int maxBoundCount, const std::string& algorithm
 		) {
 	using namespace bsccs;
 	XPtr<RcppCcdInterface> interface(inRcppCcdInterface);
@@ -370,6 +388,9 @@ void cyclopsSetControl(SEXP inRcppCcdInterface,
     args.modeFinding.swindleMultipler = swindleMultipler;
     args.modeFinding.initialBound = initialBound;
     args.modeFinding.maxBoundCount = maxBoundCount;
+    if (algorithm == "mm") {
+        args.modeFinding.algorithmType = AlgorithmType::MM;
+    }
 
 	// Cross validation control
 	args.crossValidation.useAutoSearchCV = useAutoSearch;
@@ -454,7 +475,7 @@ List cyclopsLogModel(SEXP inRcppCcdInterface) {
 	std::vector<double> values;
     auto index = data.getHasOffsetCovariate() ? 1 : 0;
     for ( ; index < ccd.getBetaSize(); ++index) {
-        labels.push_back(data.getColumn(index).getNumericalLabel());
+        labels.push_back(data.getColumnNumericalLabel(index));
         values.push_back(ccd.getBeta(index));
     }
 
@@ -493,15 +514,16 @@ List cyclopsLogModel(SEXP inRcppCcdInterface) {
 }
 
 // [[Rcpp::export(".cyclopsInitializeModel")]]
-List cyclopsInitializeModel(SEXP inModelData, const std::string& modelType, bool computeMLE = false) {
+List cyclopsInitializeModel(SEXP inModelData, const std::string& modelType, const std::string& computeDevice,
+                            bool computeMLE = false) {
 	using namespace bsccs;
 
-	XPtr<RcppModelData> rcppModelData(inModelData);
+	XPtr<AbstractModelData> rcppModelData(inModelData);
 	XPtr<RcppCcdInterface> interface(
 		new RcppCcdInterface(*rcppModelData));
 
-//	interface->getArguments().modelName = "ls"; // TODO Pass as argument
 	interface->getArguments().modelName = modelType;
+	interface->getArguments().computeDevice.name = computeDevice;
 	if (computeMLE) {
 		interface->getArguments().computeMLE = true;
 	}
@@ -550,6 +572,8 @@ bsccs::ConvergenceType RcppCcdInterface::parseConvergenceType(const std::string&
 		type = MITTAL;
 	} else if (convergenceName == "zhang") {
 		type = ZHANG_OLES;
+	} else if (convergenceName == "onestep") {
+	    type = ONE_STEP;
 	} else {
 		handleError("Invalid convergence type.");
 	}
@@ -580,6 +604,8 @@ bsccs::priors::PriorType RcppCcdInterface::parsePriorType(const std::string& pri
 		priorType = LAPLACE;
 	} else if (priorName == "normal") {
 		priorType = NORMAL;
+	} else if (priorName == "barupdate") {
+	    priorType = BAR_UPDATE;
 	} else {
  		handleError("Invalid prior type.");
  	}
@@ -663,7 +689,7 @@ priors::JointPriorPtr RcppCcdInterface::makePrior(const std::vector<std::string>
                                                   bsccs::priors::PriorFunctionPtr& priorFunctionPtr,
                                                   const ProfileVector& flatPrior) {
 
-    const auto dataLength = modelData->getNumberOfColumns();
+    const auto dataLength = modelData->getNumberOfCovariates();
 
     const auto resultsLength = priorFunctionPtr->getMaxIndex();
 
@@ -697,7 +723,7 @@ priors::JointPriorPtr RcppCcdInterface::makePrior(const std::vector<std::string>
 		const ProfileVector& flatPrior, const HierarchicalChildMap& hierarchyMap, const NeighborhoodMap& neighborhood) {
 	using namespace bsccs::priors;
 
-    const size_t length = modelData->getNumberOfColumns();
+    const size_t length = modelData->getNumberOfCovariates();
 
  	if (   flatPrior.size() == 0
  	    && hierarchyMap.size() == 0
@@ -749,7 +775,7 @@ priors::JointPriorPtr RcppCcdInterface::makePrior(const std::vector<std::string>
             prior = hPrior;
 	 	}
  	} else {
- 		const int length =  modelData->getNumberOfColumns();
+ 		const int length =  modelData->getNumberOfCovariates();
  		bsccs::shared_ptr<MixtureJointPrior> mixturePrior = bsccs::make_shared<MixtureJointPrior>(
  						singlePrior, length
  				);
@@ -814,7 +840,7 @@ priors::JointPriorPtr RcppCcdInterface::makePrior(const std::vector<std::string>
 }
 // TODO Massive code duplicate (to remove) with CmdLineCcdInterface
 void RcppCcdInterface::initializeModelImpl(
-		ModelData** modelData,
+		AbstractModelData** modelData,
 		CyclicCoordinateDescent** ccd,
 		AbstractModelSpecifics** model) {
 
@@ -823,16 +849,15 @@ void RcppCcdInterface::initializeModelImpl(
 	// Parse type of model
 	ModelType modelType = parseModelType(arguments.modelName);
 
-	*model = AbstractModelSpecifics::factory(modelType, **modelData);
+	const std::string& deviceName = arguments.computeDevice.name;
+	DeviceType deviceType = (deviceName == "native")
+	    ? DeviceType::CPU : DeviceType::GPU;
+
+	*model = AbstractModelSpecifics::factory(modelType, **modelData,
+                                          deviceType, deviceName);
 	if (*model == nullptr) {
 		handleError("Invalid model type.");
 	}
-
- #ifdef CUDA
- 	if (arguments.useGPU) {
- 		*ccd = new GPUCyclicCoordinateDescent(arguments.deviceNumber, *reader, **model);
- 	} else {
- #endif
 
  // Hierarchy management
 // 	HierarchyReader* hierarchyData;
@@ -901,15 +926,11 @@ void RcppCcdInterface::initializeModelImpl(
          //bsccs::shared_ptr<ModelData>(*modelData),
          **model, prior, logger, error);
 
- #ifdef CUDA
- 	}
- #endif
-
  	(*ccd)->setNoiseLevel(arguments.noiseLevel);
 
 }
 
-void RcppCcdInterface::predictModelImpl(CyclicCoordinateDescent *ccd, ModelData *modelData) {
+void RcppCcdInterface::predictModelImpl(CyclicCoordinateDescent *ccd, AbstractModelData *modelData) {
 
 // 	bsccs::PredictionOutputWriter predictor(*ccd, *modelData);
 //
@@ -938,7 +959,7 @@ void RcppCcdInterface::predictModelImpl(CyclicCoordinateDescent *ccd, ModelData 
 
 }
 
-void RcppCcdInterface::logModelImpl(CyclicCoordinateDescent *ccd, ModelData *modelData,
+void RcppCcdInterface::logModelImpl(CyclicCoordinateDescent *ccd, AbstractModelData *modelData,
 	    ProfileInformationMap& profileMap, bool withASE) {
 
  		// TODO Move into super-class
@@ -951,7 +972,7 @@ void RcppCcdInterface::logModelImpl(CyclicCoordinateDescent *ccd, ModelData *mod
   	estimates.writeStream(out);
 }
 
-void RcppCcdInterface::diagnoseModelImpl(CyclicCoordinateDescent *ccd, ModelData *modelData,
+void RcppCcdInterface::diagnoseModelImpl(CyclicCoordinateDescent *ccd, AbstractModelData *modelData,
 		double loadTime,
 		double updateTime) {
 
@@ -961,7 +982,7 @@ void RcppCcdInterface::diagnoseModelImpl(CyclicCoordinateDescent *ccd, ModelData
   	diagnostics.writeStream(test);
 }
 
-RcppCcdInterface::RcppCcdInterface(RcppModelData& _rcppModelData)
+RcppCcdInterface::RcppCcdInterface(AbstractModelData& _rcppModelData)
 	: rcppModelData(_rcppModelData), modelData(NULL), ccd(NULL), modelSpecifics(NULL) {
 	arguments.noiseLevel = SILENT; // Change default value from command-line version
 }

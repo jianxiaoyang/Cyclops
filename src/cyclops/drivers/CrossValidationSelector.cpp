@@ -25,7 +25,8 @@ CrossValidationSelector::CrossValidationSelector(
 		long inSeed,
 	    loggers::ProgressLoggerPtr _logger,
 		loggers::ErrorHandlerPtr _error,
-		std::vector<real>* wtsExclude) : AbstractSelector(inIds, inType, inSeed, _logger, _error), fold(inFold) {
+		std::vector<double>* wtsExclude,
+		std::vector<double>* wtsOriginal) : AbstractSelector(inIds, inType, inSeed, _logger, _error), fold(inFold) {
 
 	// Calculate interval starts
 	intervalStart.reserve(fold + 1);
@@ -53,6 +54,7 @@ CrossValidationSelector::CrossValidationSelector(
 	permutation.resize(N);
 
 	weightsExclude = wtsExclude;
+	weightsOriginal = wtsOriginal;
 }
 
 void CrossValidationSelector::reseed() {
@@ -67,12 +69,16 @@ CrossValidationSelector::~CrossValidationSelector() {
 	// Do nothing
 }
 
-void CrossValidationSelector::getWeights(int batch, std::vector<real>& weights) {
+void CrossValidationSelector::getWeights(int batch, std::vector<double>& weights) {
 	if (weights.size() != K) {
 		weights.resize(K);
 	}
 
-	std::fill(weights.begin(), weights.end(), 1.0);
+	if (weightsOriginal != nullptr) {
+	    std::copy(weightsOriginal->begin(), weightsOriginal->end(), weights.begin());
+	} else {
+	    std::fill(weights.begin(), weights.end(), 1.0);
+	}
 
 	if (batch == -1) {
 		return;
@@ -90,7 +96,11 @@ void CrossValidationSelector::getWeights(int batch, std::vector<real>& weights) 
 			if (excludeSet.find(ids.at(k)) != excludeSet.end()) { // found
 				weights[k] = 0.0;
 			} else {
-				weights[k] = 1.0; // TODO Is this necessary?
+			    if (weightsOriginal != nullptr) {
+			        weights[k] = (*weightsOriginal)[k];
+			    } else {
+				    weights[k] = 1.0;
+			    }
 			}
 		}
 	} else { // SelectorType::BY_ROW
@@ -109,10 +119,20 @@ AbstractSelector* CrossValidationSelector::clone() const {
 	return new (std::nothrow) CrossValidationSelector(*this); // default copy constructor
 }
 
-void CrossValidationSelector::getComplement(std::vector<real>& weights) {
-	for(std::vector<real>::iterator it = weights.begin(); it != weights.end(); it++) {
-		*it = 1 - *it;
-	}
+void CrossValidationSelector::getComplement(std::vector<double>& weights) {
+    if (weightsOriginal != nullptr) {
+        for (int i = 0; i < weights.size(); ++i) {
+            if (weights[i] == 0.0) {
+                weights[i] = (*weightsOriginal)[i];
+            } else {
+                weights[i] = 0.0;
+            }
+        }
+    } else {
+	    for (auto it = weights.begin(); it != weights.end(); it++) {
+		    *it = 1 - *it;
+	    }
+    }
 }
 
 void CrossValidationSelector::permute() {

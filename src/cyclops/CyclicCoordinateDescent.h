@@ -15,16 +15,7 @@
 #include "priors/JointPrior.h"
 #include "io/ProgressLogger.h"
 
-#pragma GCC diagnostic push
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-#pragma GCC diagnostic ignored "-Wpragmas"
-#endif
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wignored-attributes" // To keep C++14 quiet
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <Eigen/Dense>
-#pragma GCC diagnostic pop
-
 #include <deque>
 
 #include "Types.h"
@@ -58,21 +49,21 @@ public:
 	typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Matrix;
 
 	CyclicCoordinateDescent(
-			const ModelData& modelData,
+			const AbstractModelData& modelData,
 			AbstractModelSpecifics& specifics,
 			priors::JointPriorPtr prior,
 			loggers::ProgressLoggerPtr logger,
 			loggers::ErrorHandlerPtr error
 		);
 
-	CyclicCoordinateDescent(
-			int inN,
-			CompressedDataMatrix* inX,
-			int* inEta,
-			int* inOffs,
-			int* inNEvents,
-			int* inPid
-		);
+	// CyclicCoordinateDescent(
+	// 		int inN,
+	// 		CompressedDataMatrix* inX,
+	// 		int* inEta,
+	// 		int* inOffs,
+	// 		int* inNEvents,
+	// 		int* inPid
+	// 	);
 
 	CyclicCoordinateDescent* clone();
 
@@ -82,7 +73,9 @@ public:
 
 	double getLogLikelihood(void);
 
-	double getPredictiveLogLikelihood(double* weights);
+	//double getPredictiveLogLikelihood(double* weights);
+
+	double getNewPredictiveLogLikelihood(double* weights);
 
 	void getPredictiveEstimates(double* y, double* weights) const;
 
@@ -126,6 +119,8 @@ public:
 	void setPriorType(int priorType);
 
 	void setWeights(double* weights);
+
+	std::vector<double> getWeights();
 
 	void setLogisticRegression(bool idoLR);
 
@@ -184,7 +179,7 @@ protected:
 
 	AbstractModelSpecifics& modelSpecifics;
 	priors::JointPriorPtr jointPrior;
-	const ModelData& hXI;
+	const AbstractModelData& hXI;
 
 	CyclicCoordinateDescent(const CyclicCoordinateDescent& copy);
 
@@ -200,11 +195,13 @@ protected:
 
 	void computeFixedTermsInGradientAndHessian(void);
 
-	void findMode(int maxIterations, int convergenceType, double epsilon);
+	void findMode(const int maxIterations, const int convergenceType, const double epsilon,
+               const AlgorithmType algorithmType, const int qQN);
 
 	template <typename Iterator>
 	void findMode(Iterator begin, Iterator end,
-		const int maxIterations, const int convergenceType, const double epsilon);
+		const int maxIterations, const int convergenceType, const double epsilon,
+		const AlgorithmType algorithmType, const int qQN);
 
 	template <typename Container>
 	void computeKktConditions(Container& set);
@@ -264,9 +261,20 @@ protected:
 
 	double ccdUpdateBeta(int index);
 
+
+	void mmUpdateAllBeta(std::vector<double>& allDelta,
+                         const std::vector<bool>& fixedBeta);
+
+
 	double applyBounds(
 			double inDelta,
 			int index);
+
+	bool performCheckConvergence(int convergenceType,
+                              double epsilon,
+                              int maxIterations,
+                              int iteration,
+                              double* lastObjFunc);
 
 	double computeConvergenceCriterion(double newObjFxn, double oldObjFxn);
 
@@ -311,13 +319,14 @@ protected:
 
  	const double* hY; // K-vector
 	const int* hPid;
+
 	int** hXColumnRowIndicators; // J-vector
 
 	typedef std::vector<double> DoubleVector;
 	DoubleVector hBeta;
 
-	DoubleVector& hXBeta; // TODO Delegate to ModelSpecifics
-	DoubleVector& hXBetaSave; // Delegate
+// 	DoubleVector& hXBeta; // TODO Delegate to ModelSpecifics
+// 	DoubleVector& hXBetaSave; // Delegate
 	DoubleVector hDelta;
 	std::vector<bool> fixBeta;
 

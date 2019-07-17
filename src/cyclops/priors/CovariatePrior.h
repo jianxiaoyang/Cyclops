@@ -446,6 +446,109 @@ private:
 	VariancePtr variance;
 };
 
+class BarUpdatePrior : public CovariatePrior {
+public:
+
+    BarUpdatePrior(double variance) : CovariatePrior(), variance(makeVariance(variance)) {
+         // Do nothing
+    }
+
+    BarUpdatePrior(VariancePtr ptr) : CovariatePrior(), variance(ptr) {
+        // Do nothing
+    }
+
+    virtual ~BarUpdatePrior() {
+        // Do nothing
+    }
+
+    const std::string getDescription() const {
+        double sigma2Beta = getVariance();
+        std::stringstream info;
+        info << "BarUpdate(" << sigma2Beta << ")";
+        return info.str();
+    }
+
+    bool getIsRegularized() const {
+        return true;
+    }
+
+    bool getSupportsKktSwindle() const {
+        return false;
+    }
+
+    double getKktBoundary() const {
+        return 0.0;
+    }
+
+    double logDensity(const DoubleVector& beta, const int index) const {
+        auto x = beta[index];
+        double sigma2Beta = getVariance();
+        return -0.5 * std::log(2.0 * PI * sigma2Beta) - 0.5 * x * x / sigma2Beta;
+    }
+
+    double getDelta(GradientHessian gh, const DoubleVector& betaVector, const int index) const {
+
+        double beta = betaVector[index];
+        double lambda = 1 / getVariance();
+        double delta = 0.0;
+        double beta2 = (gh.second * beta) - gh.first;
+        int signBeta2 = sign(beta2);
+        if (std::abs(beta2) < (2 * std::sqrt(lambda * gh.second))) {
+            delta = - beta;
+        } else if (signBeta2 < 0) {
+            delta = - (beta / 2) - gh.first / (2 * gh.second) - std::sqrt(beta2 * beta2 - (4 * lambda * gh.second)) / (2 * gh.second);
+        } else if (signBeta2 > 0) {
+            delta = - (beta / 2) - gh.first / (2 * gh.second) + std::sqrt(beta2 * beta2 - (4 * lambda * gh.second)) / (2 * gh.second);
+        }
+        return delta;
+    }
+
+    std::vector<VariancePtr> getVarianceParameters() const {
+        auto tmp = std::vector<VariancePtr>();
+        tmp.push_back(variance);
+        return tmp;
+    }
+
+protected:
+    double getVariance() const {
+        return variance.get();
+    }
+
+private:
+    template <typename Vector>
+    typename Vector::value_type logIndependentDensity(const Vector& vector) const {
+        double sigma2Beta = getVariance();
+        return -0.5 * vector.size() * std::log(2.0 * PI * sigma2Beta)
+            - 0.5 * twoNormSquared(vector) / sigma2Beta;
+    }
+
+    template <typename Vector>
+    typename Vector::value_type twoNormSquared(const Vector& vector) const {
+        typename Vector::value_type norm = 0.0;
+        for (typename Vector::const_iterator it = vector.begin();
+             it != vector.end(); ++it) {
+            norm += (*it) * (*it);
+        }
+        return norm;
+    }
+
+    int sign(double x) const {
+        if (x == 0) {
+            return 0;
+        }
+        if (x < 0) {
+            return -1;
+        }
+        return 1;
+    }
+
+    VariancePtr variance;
+};
+
+
+
+
+
 class HierarchicalNormalPrior : public NormalPrior {
 public:
     typedef std::vector<int> NeighborList;

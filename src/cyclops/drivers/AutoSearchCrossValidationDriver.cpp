@@ -28,11 +28,11 @@ namespace bsccs {
 const static int MAX_STEPS = 50;
 
 AutoSearchCrossValidationDriver::AutoSearchCrossValidationDriver(
-			const ModelData& _modelData,
+			const AbstractModelData& _modelData,
 			const CCDArguments& arguments,
 			loggers::ProgressLoggerPtr _logger,
 			loggers::ErrorHandlerPtr _error,
-            vector<real>* wtsExclude
+            vector<double>* wtsExclude
 			) : AbstractCrossValidationDriver(_logger, _error, wtsExclude), modelData(_modelData),
 			maxSteps(MAX_STEPS) {
 

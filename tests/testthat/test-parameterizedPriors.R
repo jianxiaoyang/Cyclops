@@ -1,5 +1,8 @@
 library("testthat")
 
+context("test-parameterizedPriors.R")
+suppressWarnings(RNGversion("3.5.0"))
+
 test_that("lazy parameterization evaluation", {
 
     # initially invalid
