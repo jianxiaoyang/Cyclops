@@ -1004,14 +1004,17 @@ void ModelSpecifics<BaseModel,RealType>::computeGradientAndHessianImpl(int index
 	    for (; it; ++it) {
 	        const int i = it.index();
 
-	        RealType numerator1 = (Weights::isWeighted) ? // TODO Delegate condition to gNC
-	            hKWeight[i] * BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[i], static_cast<RealType>(0), static_cast<RealType>(0)) :
-	            BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[i], static_cast<RealType>(0), static_cast<RealType>(0));
+// 	        RealType numerator1 = (Weights::isWeighted) ? // TODO Delegate condition to gNC
+// 	            hKWeight[i] * BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[i], static_cast<RealType>(0), static_cast<RealType>(0)) :
+// 	            BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[i], static_cast<RealType>(0), static_cast<RealType>(0));
+// 	        RealType numerator2 = (!IteratorType::isIndicator && BaseModel::hasTwoNumeratorTerms) ?
+// 	            (Weights::isWeighted) ?
+// 	                 hKWeight[i] * BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[i]) :
+//                      BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[i])
+// 	            : static_cast<RealType>(0);
+	        RealType numerator1 = BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[i], hXBeta[i], hY[i]);
 	        RealType numerator2 = (!IteratorType::isIndicator && BaseModel::hasTwoNumeratorTerms) ?
-	            (Weights::isWeighted) ?
-	                 hKWeight[i] * BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[i]) :
-                     BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[i])
-	            : static_cast<RealType>(0);
+	                BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[i]) : static_cast<RealType>(0);
 
 	        BaseModel::incrementGradientAndHessian(it,
                     w, // Signature-only, for iterator-type specialization
@@ -1280,18 +1283,22 @@ void ModelSpecifics<BaseModel,RealType>::incrementNumeratorForGradientImpl(int i
 	IteratorType it(hX, index);
 	for (; it; ++it) {
 		const int k = it.index();
-		incrementByGroup(numerPid.data(), hPid, k,
-                   Weights::isWeighted ?
-                       hKWeight[k] * BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[k], hXBeta[k], hY[k]) :
-		               BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[k], hXBeta[k], hY[k])
-		    );
-		if (!IteratorType::isIndicator && BaseModel::hasTwoNumeratorTerms) {
-			incrementByGroup(numerPid2.data(), hPid, k,
-                    Weights::isWeighted ?
-                        hKWeight[k] * BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[k]) :
-                        BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[k])
-                );
-		}
+// 		incrementByGroup(numerPid.data(), hPid, k,
+//                    Weights::isWeighted ?
+//                        hKWeight[k] * BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[k], hXBeta[k], hY[k]) :
+// 		               BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[k], hXBeta[k], hY[k])
+// 		    );
+// 		if (!IteratorType::isIndicator && BaseModel::hasTwoNumeratorTerms) {
+// 			incrementByGroup(numerPid2.data(), hPid, k,
+//                     Weights::isWeighted ?
+//                         hKWeight[k] * BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[k]) :
+//                         BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[k])
+//                 );
+// 		}
+        incrementByGroup(numerPid.data(), hPid, k, BaseModel::gradientNumeratorContrib(it.value(), offsExpXBeta[k], hXBeta[k], hY[k]));
+        if (!IteratorType::isIndicator && BaseModel::hasTwoNumeratorTerms) {
+            incrementByGroup(numerPid2.data(), hPid, k, BaseModel::gradientNumerator2Contrib(it.value(), offsExpXBeta[k]));
+            }
 	}
 
 #ifdef CYCLOPS_DEBUG_TIMING
@@ -1379,10 +1386,13 @@ inline void ModelSpecifics<BaseModel,RealType>::updateXBetaImpl(RealType realDel
 
 		// Update denominators as well (denominators include (weight * offsExpXBeta))
 		if (BaseModel::likelihoodHasDenominator) { // Compile-time switch
-			RealType oldEntry = Weights::isWeighted ? hKWeight[k] * offsExpXBeta[k] : offsExpXBeta[k]; // TODO Delegate condition to forming offExpXBeta
-			offsExpXBeta[k] = BaseModel::getOffsExpXBeta(hOffs.data(), hXBeta[k], hY[k], k); // Update offsExpXBeta
-			RealType newEntry = Weights::isWeighted ? hKWeight[k] * offsExpXBeta[k] : offsExpXBeta[k]; // TODO Delegate condition
-			incrementByGroup(denomPid.data(), hPid, k, (newEntry - oldEntry)); // Update denominators
+			// RealType oldEntry = Weights::isWeighted ? hKWeight[k] * offsExpXBeta[k] : offsExpXBeta[k]; // TODO Delegate condition to forming offExpXBeta
+			// offsExpXBeta[k] = BaseModel::getOffsExpXBeta(hOffs.data(), hXBeta[k], hY[k], k); // Update offsExpXBeta
+			// RealType newEntry = Weights::isWeighted ? hKWeight[k] * offsExpXBeta[k] : offsExpXBeta[k]; // TODO Delegate condition
+			// incrementByGroup(denomPid.data(), hPid, k, (newEntry - oldEntry)); // Update denominators
+			RealType oldEntry = offsExpXBeta[k];
+			RealType newEntry = offsExpXBeta[k] = BaseModel::getOffsExpXBeta(hOffs.data(), hXBeta[k], hY[k], hKWeight[k], k);
+			incrementByGroup(denomPid.data(), hPid, k, (newEntry - oldEntry));
 		}
 	}
 
@@ -1408,11 +1418,13 @@ void ModelSpecifics<BaseModel,RealType>::computeRemainingStatisticsImpl() {
         fillVector(denomPid.data(), N, BaseModel::getDenomNullValue());
 
         for (size_t k = 0; k < K; ++k) {
-            offsExpXBeta[k] = BaseModel::getOffsExpXBeta(hOffs.data(), xBeta[k], hY[k], k);
-            RealType weightoffsExpXBeta =  Weights::isWeighted ?
-                hKWeight[k] * BaseModel::getOffsExpXBeta(hOffs.data(), xBeta[k], hY[k], k) :
-                BaseModel::getOffsExpXBeta(hOffs.data(), xBeta[k], hY[k], k); // TODO Delegate condition to gOEXB
-            incrementByGroup(denomPid.data(), hPid, k, weightoffsExpXBeta); // Update denominators
+            // offsExpXBeta[k] = BaseModel::getOffsExpXBeta(hOffs.data(), xBeta[k], hY[k], k);
+            // RealType weightoffsExpXBeta =  Weights::isWeighted ?
+            //     hKWeight[k] * BaseModel::getOffsExpXBeta(hOffs.data(), xBeta[k], hY[k], k) :
+            //     BaseModel::getOffsExpXBeta(hOffs.data(), xBeta[k], hY[k], k); // TODO Delegate condition to gOEXB
+            // incrementByGroup(denomPid.data(), hPid, k, weightoffsExpXBeta); // Update denominators
+            offsExpXBeta[k] = BaseModel::getOffsExpXBeta(hOffs.data(), xBeta[k], hY[k], hKWeight[k], k);
+            incrementByGroup(denomPid.data(), hPid, k, offsExpXBeta[k]);
         }
         computeAccumlatedDenominator(Weights::isWeighted);
     }
