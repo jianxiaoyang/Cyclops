@@ -1011,11 +1011,8 @@ public:
 	// 	return std::exp(xBeta);
 	// }
 	RealType getOffsExpXBeta(const RealType* offs, RealType xBeta, RealType y, RealType weight, int k) {
-	    if (weight == static_cast<RealType>(0)) {
-	        return std::exp(xBeta);
-	    } else {
-	        return weight * std::exp(xBeta);
-	    }
+	    return weight == static_cast<RealType>(0) ? std::exp(xBeta) :
+	        weight * std::exp(xBeta);
 	}
 
 	RealType logLikeDenominatorContrib(RealType ni, RealType denom) {
@@ -1264,7 +1261,8 @@ public:
 	// 	return std::exp(xBeta);
 	// }
 	RealType getOffsExpXBeta(const RealType* offs, RealType xBeta, RealType y, RealType weight, int k) {
-	    return weight * std::exp(xBeta);
+	    return weight == static_cast<RealType>(0) ? std::exp(xBeta) :
+	        weight * std::exp(xBeta);
 	}
 
 	RealType logLikeDenominatorContrib(RealType ni, RealType accDenom) {
@@ -1508,7 +1506,8 @@ public:
 	// 	return std::exp(xBeta);
 	// }
 	RealType getOffsExpXBeta(const RealType* offs, RealType xBeta, RealType y, RealType weight, int k) {
-	    return weight * std::exp(xBeta);
+	    return weight == static_cast<RealType>(0) ? std::exp(xBeta) :
+	        weight * std::exp(xBeta);
 	}
 
 	RealType logLikeDenominatorContrib(RealType ni, RealType denom) {
