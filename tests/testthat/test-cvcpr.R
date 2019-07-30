@@ -1,5 +1,4 @@
 library(testthat)
-library(survival)
 
 test_that("Check conditional Poisson with cross-validation",{
     set.seed(123)
