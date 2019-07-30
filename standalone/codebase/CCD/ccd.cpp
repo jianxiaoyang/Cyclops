@@ -4,7 +4,7 @@
  *  Created on: July, 2010
  *      Author: msuchard
  */
- 
+
 
 #include <iostream>
 #include <fstream>
@@ -26,108 +26,114 @@ using std::cout;
 
 int main(int argc, char* argv[]) {
 
-	using namespace bsccs;
+    using namespace bsccs;
 
-	CyclicCoordinateDescent* ccd = NULL;
-	AbstractModelSpecifics* model = NULL;
-	AbstractModelData* modelData = NULL;
+    CyclicCoordinateDescent* ccd = NULL;
+    AbstractModelSpecifics* model = NULL;
+    AbstractModelData* modelData = NULL;
 // 	CCDArguments arguments;
-	
-	CmdLineCcdInterface interface(argc, argv);
-	
-	CCDArguments arguments = interface.getArguments();
+
+    CmdLineCcdInterface interface(argc, argv);
+
+    CCDArguments arguments = interface.getArguments();
 
 // 	interface.parseCommandLine(argc, argv, arguments);
 
-	double timeInitialize = interface.initializeModel(&modelData, &ccd, &model);
+    double timeInitialize = interface.initializeModel(&modelData, &ccd, &model);
 
-	double timeUpdate;
-	if (arguments.crossValidation.doCrossValidation) {
-		timeUpdate = interface.runCrossValidation(ccd, modelData);
-	} else {
-		if (arguments.doPartial) {
-		    // TODO Delegate to CcdInterface
-			ProportionSelector selector(arguments.replicates, modelData->getPidVectorSTL(),
-					SelectorType::BY_PID, arguments.seed,
-					bsccs::make_shared<loggers::CoutLogger>(),
-					bsccs::make_shared<loggers::CerrErrorHandler>());
-			std::vector<double> weights;
-			selector.getWeights(0, weights);
-			ccd->setWeights(&weights[0]);
-		}
-		timeUpdate = interface.fitModel(ccd);
-		if (arguments.fitMLEAtMode) {
-			timeUpdate += interface.runFitMLEAtMode(ccd);
-		}
-	}
-	
-	double timeProfile;
-	bool doProfile = false;
-	bsccs::ProfileInformationMap profileMap;
-	if (arguments.profileCI.size() > 0) {
-		doProfile = true;
-		timeProfile = interface.profileModel(ccd, modelData, arguments.profileCI, profileMap,
-			1 /* threads */);
-	}	
+    double timeUpdate;
+    if (arguments.crossValidation.doCrossValidation) {
+        timeUpdate = interface.runCrossValidation(ccd, modelData);
+    } else {
+        if (arguments.doPartial) {
+            // TODO Delegate to CcdInterface
+            ProportionSelector selector(arguments.replicates, modelData->getPidVectorSTL(),
+                                        SelectorType::BY_PID, arguments.seed,
+                                        bsccs::make_shared<loggers::CoutLogger>(),
+                                        bsccs::make_shared<loggers::CerrErrorHandler>());
+            std::vector<double> weights;
+            selector.getWeights(0, weights);
+            ccd->setWeights(&weights[0]);
+        }
+        // Handle weights
+        auto weights = modelData->copyZVector();
+        if (weights.size() == 0) {
+            weights = std::vector<double>(modelData->getNumberOfRows(), 1);
+        }
+        ccd->setWeights(weights.data()); // TODO Only set weights when specified after BAD ACCESS fix
+        timeUpdate = interface.fitModel(ccd);
+        if (arguments.fitMLEAtMode) {
+            timeUpdate += interface.runFitMLEAtMode(ccd);
+        }
+    }
 
-	if (std::find(arguments.outputFormat.begin(),arguments.outputFormat.end(), "estimates")
-			!= arguments.outputFormat.end()) {
+    double timeProfile;
+    bool doProfile = false;
+    bsccs::ProfileInformationMap profileMap;
+    if (arguments.profileCI.size() > 0) {
+        doProfile = true;
+        timeProfile = interface.profileModel(ccd, modelData, arguments.profileCI, profileMap,
+                                             1 /* threads */);
+    }
+
+    if (std::find(arguments.outputFormat.begin(),arguments.outputFormat.end(), "estimates")
+        != arguments.outputFormat.end()) {
 #ifndef MY_RCPP_FLAG
-		// TODO Make into OutputWriter
-		bool withASE = arguments.fitMLEAtMode || arguments.computeMLE || arguments.reportASE;    
-		interface.logModel(ccd, modelData, profileMap, withASE);
+        // TODO Make into OutputWriter
+        bool withASE = arguments.fitMLEAtMode || arguments.computeMLE || arguments.reportASE;
+        interface.logModel(ccd, modelData, profileMap, withASE);
 #endif
-	}
+    }
 
-	double timePredict;
-	bool doPrediction = false;
-	if (std::find(arguments.outputFormat.begin(),arguments.outputFormat.end(), "prediction")
-			!= arguments.outputFormat.end()) {
-		doPrediction = true;
-		timePredict = interface.predictModel(ccd, modelData);
-	}
+    double timePredict;
+    bool doPrediction = false;
+    if (std::find(arguments.outputFormat.begin(),arguments.outputFormat.end(), "prediction")
+        != arguments.outputFormat.end()) {
+        doPrediction = true;
+        timePredict = interface.predictModel(ccd, modelData);
+    }
 
-	double timeDiagnose;
-	bool doDiagnosis = false;
-	if (std::find(arguments.outputFormat.begin(),arguments.outputFormat.end(), "diagnostics")
-			!= arguments.outputFormat.end()) {
-		doDiagnosis = true;
-		timeDiagnose = interface.diagnoseModel(ccd, modelData, timeInitialize, timeUpdate);
-	}
+    double timeDiagnose;
+    bool doDiagnosis = false;
+    if (std::find(arguments.outputFormat.begin(),arguments.outputFormat.end(), "diagnostics")
+        != arguments.outputFormat.end()) {
+        doDiagnosis = true;
+        timeDiagnose = interface.diagnoseModel(ccd, modelData, timeInitialize, timeUpdate);
+    }
 
-	if (arguments.doBootstrap) {
-		// Save parameter point-estimates
-		std::vector<double> savedBeta;
-		for (int j = 0; j < ccd->getBetaSize(); ++j) {
-			savedBeta.push_back(ccd->getBeta(j));
-		} // TODO Handle above work in interface.runBootstrap
-		timeUpdate += interface.runBoostrap(ccd, modelData, savedBeta);
-	}
-		
-	using std::scientific;
-		
-	cout << endl;
-	cout << "Load    duration: " << scientific << timeInitialize << endl;
-	cout << "Update  duration: " << scientific << timeUpdate << endl;
-	if (doPrediction) {
-		cout << "Predict duration: " << scientific << timePredict << endl;
-	}
-	
-	if (doDiagnosis) {
-		cout << "Diag    duration: " << scientific << timeDiagnose << endl;
-	}
+    if (arguments.doBootstrap) {
+        // Save parameter point-estimates
+        std::vector<double> savedBeta;
+        for (int j = 0; j < ccd->getBetaSize(); ++j) {
+            savedBeta.push_back(ccd->getBeta(j));
+        } // TODO Handle above work in interface.runBootstrap
+        timeUpdate += interface.runBoostrap(ccd, modelData, savedBeta);
+    }
+
+    using std::scientific;
+
+    cout << endl;
+    cout << "Load    duration: " << scientific << timeInitialize << endl;
+    cout << "Update  duration: " << scientific << timeUpdate << endl;
+    if (doPrediction) {
+        cout << "Predict duration: " << scientific << timePredict << endl;
+    }
+
+    if (doDiagnosis) {
+        cout << "Diag    duration: " << scientific << timeDiagnose << endl;
+    }
 
 //#define PRINT_LOG_LIKELIHOOD
 #ifdef PRINT_LOG_LIKELIHOOD
-	cout << endl << setprecision(15) << ccd->getLogLikelihood() << endl;
+    cout << endl << setprecision(15) << ccd->getLogLikelihood() << endl;
 #endif
 
-	if (ccd)
-		delete ccd;
-	if (model)
-		delete model;
-	if (modelData)
-		delete modelData;
+    if (ccd)
+        delete ccd;
+    if (model)
+        delete model;
+    if (modelData)
+        delete modelData;
 
     return 0;
 }
